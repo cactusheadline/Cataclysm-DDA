@@ -3,6 +3,7 @@
 #define CATA_SRC_ACTIVITY_ACTOR_DEFINITIONS_H
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -44,6 +45,7 @@ class avatar;
 class npc;
 class SkillLevel;
 class player_activity;
+class wound;
 
 struct islot_book;
 struct pulp_data;
@@ -3890,18 +3892,19 @@ class fix_wound_activity_actor : public activity_actor
 {
     public:
         fix_wound_activity_actor( time_duration initial_moves, bodypart_id healed_bp,
-                                  wound_type_id mended_wound, wound_fix_id mending_method ) :
+                                  wound_type_id mended_wound, wound_fix_id mending_method,
+                                  std::int64_t wound_uid = 0 ) :
             initial_moves( initial_moves ), healed_bp( healed_bp ),
-            mended_wound( mended_wound ), mending_method( mending_method ) { }
+            mended_wound( mended_wound ), mending_method( mending_method ), wound_uid( wound_uid ) { }
 
-        const activity_id &get_type() const override {
-            static const activity_id ACT_TREAT_WOUND( "ACT_TREAT_WOUND" );
-            return ACT_TREAT_WOUND;
-        }
+        const activity_id &get_type() const override;
 
-        void start( player_activity &act, Character & ) override;
-        void do_turn( player_activity &, Character & ) override {};
+        void start( player_activity &act, Character &who ) override;
+        void do_turn( player_activity &act, Character &who ) override;
         void finish( player_activity &act, Character &who ) override;
+
+        bool is_applying_pressure( const Character &who, const bodypart_id &bp,
+                                   const wound &wd ) const;
 
         std::unique_ptr<activity_actor> clone() const override {
             return std::make_unique<fix_wound_activity_actor>( *this );
@@ -3916,6 +3919,9 @@ class fix_wound_activity_actor : public activity_actor
         bodypart_id healed_bp;
         wound_type_id mended_wound;
         wound_fix_id mending_method;
+        std::int64_t wound_uid = 0;
+
+        const wound *target_wound( const Character &who ) const;
 };
 
 class gunmod_add_activity_actor : public activity_actor

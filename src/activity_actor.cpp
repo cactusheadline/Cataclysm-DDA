@@ -151,6 +151,7 @@
 #include "wound.h"
 
 static const activity_id ACT_AIM( "ACT_AIM" );
+static const activity_id ACT_APPLY_PRESSURE( "ACT_APPLY_PRESSURE" );
 static const activity_id ACT_ATM( "ACT_ATM" );
 static const activity_id ACT_AUTODRIVE( "ACT_AUTODRIVE" );
 static const activity_id ACT_BASH( "ACT_BASH" );
@@ -255,6 +256,7 @@ static const activity_id ACT_TENT_PLACE( "ACT_TENT_PLACE" );
 static const activity_id ACT_TOOLMOD_ADD( "ACT_TOOLMOD_ADD" );
 static const activity_id ACT_TRAIN( "ACT_TRAIN" );
 static const activity_id ACT_TREE_COMMUNION( "ACT_TREE_COMMUNION" );
+static const activity_id ACT_TREAT_WOUND( "ACT_TREAT_WOUND" );
 static const activity_id ACT_TRY_SLEEP( "ACT_TRY_SLEEP" );
 static const activity_id ACT_UNLOAD( "ACT_UNLOAD" );
 static const activity_id ACT_UNLOAD_LOOT( "ACT_UNLOAD_LOOT" );
@@ -11266,22 +11268,76 @@ std::unique_ptr<activity_actor> mend_item_activity_actor::deserialize( JsonValue
     return actor.clone();
 }
 
-void fix_wound_activity_actor::start( player_activity &act, Character & )
+const activity_id &fix_wound_activity_actor::get_type() const
+{
+    return mending_method.is_valid() && mending_method->applies_pressure ?
+           ACT_APPLY_PRESSURE : ACT_TREAT_WOUND;
+}
+
+const wound *fix_wound_activity_actor::target_wound( const Character &who ) const
+{
+    const bodypart *bp = who.get_part( healed_bp );
+    if( !bp ) {
+        return nullptr;
+    }
+    for( const wound &wd : bp->get_wounds() ) {
+        if( wd.type == mended_wound && ( wound_uid == 0 || wd.get_uid() == wound_uid ) ) {
+            return &wd;
+        }
+    }
+    return nullptr;
+}
+
+bool fix_wound_activity_actor::is_applying_pressure( const Character &who, const bodypart_id &bp,
+        const wound &wd ) const
+{
+    return mending_method.is_valid() && mending_method->applies_pressure &&
+           bp == healed_bp && wd.type == mended_wound && wd.get_uid() == wound_uid &&
+           who.can_apply_wound_pressure( healed_bp );
+}
+
+void fix_wound_activity_actor::start( player_activity &act, Character &who )
 {
     act.moves_total = to_moves<int>( initial_moves );
     act.moves_left = act.moves_total;
+
+    if( const wound *wd = target_wound( who ) ) {
+        wound_uid = wd->get_uid();
+    }
+    do_turn( act, who );
+}
+
+void fix_wound_activity_actor::do_turn( player_activity &act, Character &who )
+{
+    if( !target_wound( who ) || !mending_method.is_valid() ) {
+        act.set_to_null();
+        return;
+    }
+    if( mending_method->applies_pressure ) {
+        if( !who.can_apply_wound_pressure( healed_bp ) ) {
+            who.add_msg_if_player( m_info,
+                                   _( "You need empty hands and a usable arm to hold pressure on this wound." ) );
+            act.set_to_null();
+            return;
+        }
+        for( const auto &[skill, level] : mending_method->skills ) {
+            if( who.get_greater_skill_or_knowledge_level( skill ) < level ) {
+                act.set_to_null();
+                return;
+            }
+        }
+    }
 }
 
 void fix_wound_activity_actor::finish( player_activity &act, Character &who )
 {
+    do_turn( act, who );
+    if( !act ) {
+        return;
+    }
     act.set_to_null();
 
     bodypart *bp = who.get_part( healed_bp );
-
-    if( !bp->has_wound( mended_wound ) ) {
-        // wound naturally disappeared while we tried to treat it
-        return;
-    }
     if( mending_method.is_empty() ) {
         debugmsg( "missing wound fix for ACT_TREAT_WOUND." );
         return;
@@ -11306,7 +11362,17 @@ void fix_wound_activity_actor::finish( player_activity &act, Character &who )
     who.invalidate_crafting_inventory();
 
     for( const wound_type_id &id : fix.wounds_removed ) {
-        bp->remove_wound( id );
+        if( id == mended_wound && wound_uid != 0 ) {
+            std::vector<wound> &wounds = bp->get_wounds();
+            const auto it = std::find_if( wounds.begin(), wounds.end(), [this]( const wound & wd ) {
+                return wd.get_uid() == wound_uid;
+            } );
+            if( it != wounds.end() ) {
+                wounds.erase( it );
+            }
+        } else {
+            bp->remove_wound( id );
+        }
     }
 
     for( const wound_type_id &id : fix.wounds_added ) {
@@ -11336,6 +11402,8 @@ void fix_wound_activity_actor::serialize( JsonOut &jsout ) const
     jsout.member( "mended_wound", mended_wound );
     jsout.member( "mending_method", mending_method );
 
+    jsout.member( "wound_uid", wound_uid );
+
     jsout.end_object();
 }
 
@@ -11348,6 +11416,8 @@ std::unique_ptr<activity_actor> fix_wound_activity_actor::deserialize( JsonValue
     data.read( "healed_bp", actor.healed_bp );
     data.read( "mended_wound", actor.mended_wound );
     data.read( "mending_method", actor.mending_method );
+
+    data.read( "wound_uid", actor.wound_uid );
 
     return actor.clone();
 }
@@ -15542,6 +15612,7 @@ namespace activity_actors
 const std::unordered_map<activity_id, std::unique_ptr<activity_actor>( * )( JsonValue & )>
 deserialize_functions = {
     { ACT_AIM, &aim_activity_actor::deserialize },
+    { ACT_APPLY_PRESSURE, &fix_wound_activity_actor::deserialize },
     { ACT_ATM, &atm_activity_actor::deserialize },
     { ACT_AUTODRIVE, &autodrive_activity_actor::deserialize },
     { ACT_BASH, &bash_activity_actor::deserialize },
@@ -15646,6 +15717,7 @@ deserialize_functions = {
     { ACT_TOOLMOD_ADD, &toolmod_add_activity_actor::deserialize },
     { ACT_TRAIN, &training_activity_actor::deserialize },
     { ACT_TREE_COMMUNION, &tree_communion_activity_actor::deserialize },
+    { ACT_TREAT_WOUND, &fix_wound_activity_actor::deserialize },
     { ACT_TRY_SLEEP, &try_sleep_activity_actor::deserialize },
     { ACT_UNLOAD, &unload_activity_actor::deserialize },
     { ACT_UNLOAD_LOOT, &unload_loot_activity_actor::deserialize },

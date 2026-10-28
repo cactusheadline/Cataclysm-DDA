@@ -65,6 +65,15 @@ Wound fix is a way for wounds to be treated. You should append _fix to the end o
 
 Wound fixes support everything recipes support.
 
+Setting `applies_pressure` to `true` makes a fix an interruptible direct-pressure treatment.
+It requires empty hands and a usable arm other than the injured arm, and uses elapsed time
+instead of character speed.  While the activity is active, only its selected wound stops
+dripping blood and losing `blood` and `redcells`.  Other wounds and other vitamin changes
+are unaffected.  Canceling ends that protection immediately; restarting requires the full
+treatment time.  On completion, `wounds_removed` and `wounds_added` should replace exactly
+one bleeding wound with its untreated, nonbleeding counterpart.  A pressure fix must not
+restore HP.  Only wounds that can be controlled with direct pressure should offer this fix.
+
 ```jsonc
   {
     "id": "bandage_the_bleeding",

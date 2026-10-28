@@ -1,5 +1,6 @@
 #include "wound.h"
 
+#include <algorithm>
 #include <memory>
 #include <set>
 
@@ -15,6 +16,8 @@
 
 enum class bp_type;
 template <typename E> struct enum_traits;
+
+std::int64_t wound::next_uid = 1;
 
 void wound_type::load( const JsonObject &jo, const std::string_view & )
 {
@@ -151,6 +154,11 @@ void wound_fix::check_consistency()
 
 void wound_fix::check() const
 {
+    if( applies_pressure && ( time <= 0_seconds || wounds_removed.size() != 1 ||
+                              wounds_added.size() != 1 || mod_hp != 0 ) ) {
+        debugmsg( "pressure wound_fix '%s' must take time and replace exactly one wound without restoring HP",
+                  id.str() );
+    }
     for( const auto &[skill_id, lvl] : skills ) {
         if( !skill_id.is_valid() ) {
             debugmsg( "wound_fix %s requires unknown skill '%s'", id.str(), skill_id.str() );
@@ -275,6 +283,7 @@ void wound_fix::load( const JsonObject &jo, const std::string_view & )
     optional( jo, was_loaded, "success_msg", success_msg );
     optional( jo, was_loaded, "mod_hp", mod_hp, 0 );
     optional( jo, was_loaded, "time", time );
+    optional( jo, was_loaded, "applies_pressure", applies_pressure, false );
     optional( jo, was_loaded, "skills", skills );
     optional( jo, was_loaded, "wounds_removed", wounds_removed );
     optional( jo, was_loaded, "wounds_added", wounds_added );
@@ -412,6 +421,7 @@ void wound::serialize( JsonOut &jsout ) const
 {
     jsout.start_object();
     jsout.member( "type", type );
+    jsout.member( "uid", uid );
     jsout.member( "healing_time", healing_time );
     jsout.member( "healing_progress", healing_progress );
     jsout.member( "wound_progress_timer", wound_progress_timer );
@@ -422,6 +432,8 @@ void wound::serialize( JsonOut &jsout ) const
 void wound::deserialize( const JsonObject &jsin )
 {
     jsin.read( "type", type );
+    jsin.read( "uid", uid );
+    next_uid = std::max( next_uid, uid + 1 );
     jsin.read( "healing_time", healing_time );
     jsin.read( "healing_progress", healing_progress );
     jsin.read( "wound_progress_timer", wound_progress_timer );

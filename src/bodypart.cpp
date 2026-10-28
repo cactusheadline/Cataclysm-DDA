@@ -1177,6 +1177,7 @@ void bodypart::add_or_worsen_wound( const wound &wd )
 void bodypart::add_wound( const wound &wd )
 {
     wounds.emplace_back( wd );
+    wounds.back().uid = wound::next_uid++;
 }
 
 void bodypart::add_wound( const wound_type_id wd )
