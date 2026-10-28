@@ -23,6 +23,7 @@ static const activity_id ACT_APPLY_PRESSURE( "ACT_APPLY_PRESSURE" );
 static const activity_id ACT_TREAT_WOUND( "ACT_TREAT_WOUND" );
 static const efftype_id effect_sleep( "sleep" );
 static const itype_id itype_rock( "rock" );
+static const itype_id itype_bottle_plastic( "bottle_plastic" );
 static const itype_id itype_water_clean( "water_clean" );
 static const skill_id skill_firstaid( "firstaid" );
 static const vitamin_id vitamin_blood( "blood" );
@@ -284,8 +285,9 @@ TEST_CASE( "healthcare_one_can_clean_and_recover_after_pressure", "[wound][bleed
     const wound_type_id cleaned( "clean_laceration_medium" );
     REQUIRE( clean->skills.at( skill_firstaid ) == 1 );
     item water( itype_water_clean );
-    water.charges = 10;
-    who.i_add( water );
+    water.charges = 2;
+    who.i_add( water.in_container( itype_bottle_plastic, 2, false ) );
+    who.invalidate_crafting_inventory();
     REQUIRE( clean->get_requirements().can_make_with_inventory( &who, who.crafting_inventory(),
              is_crafting_component ) );
     who.assign_activity( fix_wound_activity_actor( clean->time, bp, wound_laceration_medium, clean ) );
