@@ -1,0 +1,58 @@
+[
+  {
+    "abstract": "pressure_wound_medium",
+    "type": "wound_fix",
+    "name": "apply pressure",
+    "description": "Hold firm pressure on the wound until the bleeding stops.  You need empty hands and a usable arm.  The wound will still need cleaning afterward.",
+    "time": "10 minutes",
+    "skills": { "firstaid": 1 },
+    "applies_pressure": true,
+    "proficiencies": [ { "proficiency": "prof_wound_care", "time_save": 0.75 } ]
+  },
+  {
+    "abstract": "pressure_wound_bad",
+    "copy-from": "pressure_wound_medium",
+    "type": "wound_fix",
+    "time": "20 minutes"
+  },
+  {
+    "id": "pressure_laceration_medium_fix",
+    "copy-from": "pressure_wound_medium",
+    "type": "wound_fix",
+    "wounds_removed": [ "bleeding_laceration_medium" ],
+    "wounds_added": [ "laceration_medium" ],
+    "success_msg": "Your laceration has stopped bleeding."
+  },
+  {
+    "id": "pressure_laceration_bad_fix",
+    "copy-from": "pressure_wound_bad",
+    "type": "wound_fix",
+    "wounds_removed": [ "bleeding_laceration_bad" ],
+    "wounds_added": [ "laceration_bad" ],
+    "success_msg": "Your bad laceration has stopped bleeding."
+  },
+  {
+    "id": "pressure_scratch_bad_fix",
+    "copy-from": "pressure_wound_bad",
+    "type": "wound_fix",
+    "wounds_removed": [ "bleeding_scratch_bad" ],
+    "wounds_added": [ "scratch_bad" ],
+    "success_msg": "Your bad scratch has stopped bleeding."
+  },
+  {
+    "id": "pressure_cut_medium_fix",
+    "copy-from": "pressure_wound_medium",
+    "type": "wound_fix",
+    "wounds_removed": [ "bleeding_cut_medium" ],
+    "wounds_added": [ "cut_medium" ],
+    "success_msg": "Your cut has stopped bleeding."
+  },
+  {
+    "id": "pressure_cut_bad_fix",
+    "copy-from": "pressure_wound_bad",
+    "type": "wound_fix",
+    "wounds_removed": [ "bleeding_cut_bad" ],
+    "wounds_added": [ "cut_bad" ],
+    "success_msg": "Your deep cut has stopped bleeding."
+  }
+]

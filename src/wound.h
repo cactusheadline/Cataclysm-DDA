@@ -3,6 +3,7 @@
 #define CATA_SRC_WOUND_H
 
 #include <climits>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -166,6 +167,10 @@ class wound
 
         wound_type_id type;
 
+        std::int64_t get_uid() const {
+            return uid;
+        }
+
         void serialize( JsonOut &jsout ) const;
         void deserialize( const JsonObject &jsin );
         // returns the wound healing progress divided by healing time
@@ -194,10 +199,13 @@ class wound
         }
 
     private:
+        friend class bodypart;
+        static std::int64_t next_uid;
+        std::int64_t uid = next_uid++;
         // how long it takes for this wound to heal. Can be adjusted by wound fix.
         time_duration healing_time;
         // how much time passed since this wound was applied, in seconds
-        float healing_progress;
+        float healing_progress = 0.f;
         // how much pain this specific wound provide.
         int pain;
 
@@ -223,6 +231,8 @@ class wound_fix
         translation description;
         translation success_msg; // message to print on applying successfully
         time_duration time = 0_seconds;
+        // Hold direct pressure throughout treatment, suppressing the selected wound's bleeding.
+        bool applies_pressure = false;
         // amount of hp that will be added to limb once the wound is fixes. Mainly for bionic
         int mod_hp = 0;
         std::map<skill_id, int> skills; // map of skill_id to required level

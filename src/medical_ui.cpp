@@ -1,4 +1,5 @@
 #include <imgui/imgui.h>
+#include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <map>
@@ -536,6 +537,7 @@ struct healing_option {
     wound_fix_id fix;
     bool doable;
     time_duration time_to_apply;
+    std::int64_t wound_uid;
 };
 } // namespace
 
@@ -578,7 +580,10 @@ bool Character::pick_wound_fix( const bodypart_id &bp_id )
 
     for( const wound &wd : wounds ) {
         for( const wound_fix_id &fix_id : wd.type->fixes ) {
-            healing_option opt{wd.type, fix_id, true, fix_id->time};
+            healing_option opt{wd.type, fix_id, true, fix_id->time, wd.get_uid()};
+            if( fix_id->applies_pressure && !can_apply_wound_pressure( bp_id ) ) {
+                opt.doable = false;
+            }
 
             for( const auto &[skill_id, level] : fix_id->skills ) {
                 if( get_greater_skill_or_knowledge_level( skill_id ) < level ) {
@@ -705,7 +710,8 @@ bool Character::pick_wound_fix( const bodypart_id &bp_id )
         return false;
     }
 
-    assign_activity( fix_wound_activity_actor( opt.time_to_apply, bp_id, opt.wd, opt.fix ) );
+    assign_activity( fix_wound_activity_actor( opt.time_to_apply, bp_id, opt.wd, opt.fix,
+                     opt.wound_uid ) );
 
     return true;
 }

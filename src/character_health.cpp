@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "action.h"
+#include "activity_actor_definitions.h"
 #include "activity_handlers.h"
 #include "activity_tracker.h"
 #include "addiction.h"
@@ -2582,12 +2583,35 @@ void Character::apply_wound( bodypart_id bp, wound_type_id wd )
     morale->on_stat_change( "perceived_pain", get_perceived_pain() );
 }
 
+bool Character::can_apply_wound_pressure( const bodypart_id &bp ) const
+{
+    if( !get_part( bp ) || is_armed() || controlling_vehicle || in_sleep_state() ) {
+        return false;
+    }
+
+    static const limb_score_id limb_score_lift( "lift" );
+    for( const bodypart_id &arm : get_all_body_parts_of_type( bp_type::arm ) ) {
+        if( arm == bp->main_part || is_limb_broken( arm ) ) {
+            continue;
+        }
+        const bodypart *limb = get_part( arm );
+        if( limb->get_limb_score( *this, limb_score_lift ) * arm->limbtypes.at( bp_type::arm ) >= 0.1f &&
+            !limb->is_limb_overencumbered( *this ) ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Character::update_wounds( time_duration time_passed )
 {
+    const fix_wound_activity_actor *treatment = activity ?
+            dynamic_cast<const fix_wound_activity_actor *>( activity.actor.get() ) : nullptr;
     for( auto& [bp_id, bp] : body ) {
         bp.update_wounds( *this, time_passed );
 
         for( wound &wd : bp.get_wounds() ) {
+            const bool applying_pressure = treatment && treatment->is_applying_pressure( *this, bp_id, wd );
             for( const wound_mod_values &mod_val : wd.type->get_modify_values() ) {
                 if( calendar::once_every( mod_val.rate ) ) {
                     switch( mod_val.type ) {
@@ -2598,7 +2622,9 @@ void Character::update_wounds( time_duration time_passed )
                             }
                             break;
                         case wound_mod_value_type::BLEED:
-                            bleed( get_map() );
+                            if( !applying_pressure ) {
+                                bleed( get_map() );
+                            }
                             break;
                         case wound_mod_value_type::VITAMIN:
                             if( mod_val.vitamin.has_value() ) {
@@ -2611,6 +2637,9 @@ void Character::update_wounds( time_duration time_passed )
 
                                 int final_amt = mod_val.amount;
                                 if( vit == vitamin_blood || vit == vitamin_redcells ) {
+                                    if( applying_pressure && final_amt < 0 ) {
+                                        break;
+                                    }
                                     final_amt = roll_remainder( enchantment_cache->modify_value( enchant_vals::mod::BLEEDING_RATE,
                                                                 mod_val.amount ) );
                                 }
@@ -2625,7 +2654,7 @@ void Character::update_wounds( time_duration time_passed )
             }
 
             const std::optional<wound_periodic_message> msg = wd.type->get_periodic_message();
-            if( msg.has_value() && calendar::once_every( msg->rate ) ) {
+            if( !applying_pressure && msg.has_value() && calendar::once_every( msg->rate ) ) {
                 add_msg_if_player( m_bad, string_format( msg->message.translated(), body_part_name( bp_id ) ) );
             }
         }

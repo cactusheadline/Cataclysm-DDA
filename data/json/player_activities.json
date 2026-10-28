@@ -680,6 +680,17 @@
     "auto_needs": true
   },
   {
+    "id": "ACT_APPLY_PRESSURE",
+    "type": "activity_type",
+    "activity_level": "LIGHT_EXERCISE",
+    "verb": "applying pressure",
+    "rooted": true,
+    "based_on": "time",
+    "can_resume": false,
+    "refuel_fires": false,
+    "auto_needs": false
+  },
+  {
     "id": "ACT_TREAT_WOUND",
     "type": "activity_type",
     "activity_level": "NO_EXERCISE",
